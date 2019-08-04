@@ -3,8 +3,8 @@ package ut
 import (
 	"github.com/go-playground/locales"
 	"github.com/go-playground/locales/en"
-	"github.com/go-playground/universal-translator"
-	"github.com/sarulabs/di"
+	ut "github.com/go-playground/universal-translator"
+	"github.com/sarulabs/di/v2"
 )
 
 type (
