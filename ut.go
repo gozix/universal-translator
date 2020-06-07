@@ -14,6 +14,9 @@ type (
 		locales  []locales.Translator
 	}
 
+	// Configurator is configurator func interface.
+	Configurator = func(*ut.UniversalTranslator) error
+
 	// Translator type alias of ut.Translator.
 	Translator = ut.Translator
 
@@ -32,6 +35,12 @@ type (
 const (
 	// BundleName is default definition name.
 	BundleName = "universal-translator"
+
+	// TranslatorConfiguratorName is definition name.
+	TranslatorConfiguratorName = "universal-translator.configurator.translator"
+
+	// TagConfigurator is tag to mark configurator injections.
+	TagConfigurator = "universal-translator.configurator"
 
 	// TagTranslator is tag to mark injected locale translator.
 	TagTranslator = "universal-translator.locale-translator"
@@ -79,33 +88,64 @@ func (b *Bundle) Name() string {
 
 // Build implements the glue.Bundle interface.
 func (b *Bundle) Build(builder *di.Builder) error {
-	return builder.Add(di.Def{
-		Name: BundleName,
-		Build: func(ctn di.Container) (_ interface{}, err error) {
-			var translator = ut.New(b.fallback, b.locales...)
-			for name, def := range ctn.Definitions() {
-				for _, tag := range def.Tags {
-					if tag.Name != TagTranslator {
-						continue
-					}
+	return builder.Add(
+		di.Def{
+			Name: BundleName,
+			Build: func(ctn di.Container) (_ interface{}, err error) {
+				var configurators = make([]Configurator, 0, 4)
+				for name, def := range ctn.Definitions() {
+					for _, tag := range def.Tags {
+						if TagConfigurator != tag.Name {
+							continue
+						}
 
-					var localeTranslator locales.Translator
-					if err = ctn.Fill(name, &localeTranslator); err != nil {
-						return nil, err
-					}
+						var configurator Configurator
+						if err = ctn.Fill(name, &configurator); err != nil {
+							return nil, err
+						}
 
-					_, override := tag.Args[TagArgOverride]
-					if err = translator.AddTranslator(localeTranslator, override); err != nil {
-						return nil, err
+						configurators = append(configurators, configurator)
 					}
-
-					break
 				}
-			}
 
-			return translator, nil
+				var translator = ut.New(b.fallback, b.locales...)
+				for _, configurator := range configurators {
+					if err = configurator(translator); err != nil {
+						return nil, err
+					}
+				}
+
+				return translator, nil
+			},
+		}, di.Def{
+			Name: TranslatorConfiguratorName,
+			Build: func(ctn di.Container) (interface{}, error) {
+				return func(translator ut.UniversalTranslator) (err error) {
+					for name, def := range ctn.Definitions() {
+						for _, tag := range def.Tags {
+							if tag.Name != TagTranslator {
+								continue
+							}
+
+							var localeTranslator locales.Translator
+							if err = ctn.Fill(name, &localeTranslator); err != nil {
+								return err
+							}
+
+							_, override := tag.Args[TagArgOverride]
+							if err = translator.AddTranslator(localeTranslator, override); err != nil {
+								return err
+							}
+
+							break
+						}
+					}
+
+					return nil
+				}, nil
+			},
 		},
-	})
+	)
 }
 
 // apply implements Option.
