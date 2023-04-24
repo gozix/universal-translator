@@ -7,10 +7,16 @@ package ut
 import (
 	"github.com/gozix/di"
 	"github.com/gozix/glue/v3"
+	"github.com/gozix/universal-translator/v3/internal/configurator"
 
 	"github.com/go-playground/locales"
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
+)
+
+type (
+	// Configurator is type alias of configurator.Configurator.
+	Configurator = configurator.Configurator
 )
 
 // Bundle implements the glue.Bundle interface.
@@ -51,10 +57,11 @@ func (b *Bundle) Build(builder di.Builder) error {
 		b.provideUT,
 		di.Constraint(0, di.Optional(true), withTranslator(false)),
 		di.Constraint(1, di.Optional(true), withTranslator(true)),
+		di.Constraint(2, di.Optional(true), withConfigurator()),
 	)
 }
 
-func (b *Bundle) provideUT(append []locales.Translator, override []locales.Translator) (_ *ut.UniversalTranslator, err error) {
+func (b *Bundle) provideUT(append []locales.Translator, override []locales.Translator, configurators []configurator.Configurator) (_ *ut.UniversalTranslator, err error) {
 	var translator = ut.New(b.fallback, b.locales...)
 
 	for _, localeTranslator := range append {
@@ -65,6 +72,12 @@ func (b *Bundle) provideUT(append []locales.Translator, override []locales.Trans
 
 	for _, localeTranslator := range override {
 		if err = translator.AddTranslator(localeTranslator, true); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, configure := range configurators {
+		if err = configure(translator); err != nil {
 			return nil, err
 		}
 	}

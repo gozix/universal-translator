@@ -7,12 +7,22 @@ package ut
 import "github.com/gozix/di"
 
 const (
+	// TagConfigurator is tag to mark configurators.
+	TagConfigurator = "universal-translator.configurator"
+
 	// TagTranslator is a tag for marking locale translator without overriding existing.
 	TagTranslator = "universal-translator.locale-translator"
 
 	// TagTranslatorOverride is a tag for marking locale translator with overriding existing.
 	TagTranslatorOverride = "universal-translator.locale-translator.override"
 )
+
+// AsConfigurator is syntax sugar for the di container.
+func AsConfigurator() di.ProvideOption {
+	return di.Tags{{
+		Name: TagConfigurator,
+	}}
+}
 
 func AsTranslator(override bool) di.Tags {
 	if override {
@@ -24,6 +34,10 @@ func AsTranslator(override bool) di.Tags {
 	return di.Tags{{
 		Name: TagTranslator,
 	}}
+}
+
+func withConfigurator() di.Modifier {
+	return di.WithTags(TagConfigurator)
 }
 
 func withTranslator(override bool) di.Modifier {
