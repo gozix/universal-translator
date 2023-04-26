@@ -13,11 +13,16 @@ import (
 	ut "github.com/go-playground/universal-translator"
 )
 
-// Bundle implements the glue.Bundle interface.
-type Bundle struct {
-	fallback locales.Translator
-	locales  []locales.Translator
-}
+type (
+	// Bundle implements the glue.Bundle interface.
+	Bundle struct {
+		fallback locales.Translator
+		locales  []locales.Translator
+	}
+
+	// Configurator configures universal translator after its creation.
+	Configurator func(*ut.UniversalTranslator) error
+)
 
 // Bundle implements the glue.Bundle interface.
 var _ glue.Bundle = (*Bundle)(nil)
@@ -51,10 +56,11 @@ func (b *Bundle) Build(builder di.Builder) error {
 		b.provideUT,
 		di.Constraint(0, di.Optional(true), withTranslator(false)),
 		di.Constraint(1, di.Optional(true), withTranslator(true)),
+		di.Constraint(2, di.Optional(true), withConfigurator()),
 	)
 }
 
-func (b *Bundle) provideUT(append []locales.Translator, override []locales.Translator) (_ *ut.UniversalTranslator, err error) {
+func (b *Bundle) provideUT(append []locales.Translator, override []locales.Translator, configurators []Configurator) (_ *ut.UniversalTranslator, err error) {
 	var translator = ut.New(b.fallback, b.locales...)
 
 	for _, localeTranslator := range append {
@@ -65,6 +71,12 @@ func (b *Bundle) provideUT(append []locales.Translator, override []locales.Trans
 
 	for _, localeTranslator := range override {
 		if err = translator.AddTranslator(localeTranslator, true); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, configure := range configurators {
+		if err = configure(translator); err != nil {
 			return nil, err
 		}
 	}
